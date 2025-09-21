@@ -1,5 +1,13 @@
 use regex::Regex;
 use url::Url;
+use std::collections::HashMap;
+use std::str;
+use reqwest::{self, Client, header};
+
+
+pub fn append_to_crawl(link: String, typez: i32, wheres: &mut HashMap<i32, Vec<String>>){
+    wheres.entry(typez).or_insert(Vec::new()).push(link.to_string())
+}
 
 pub fn extract_host(url: &str) -> Option<String> {
     let re_host = Regex::new(
@@ -34,7 +42,7 @@ pub fn extract_base_domain(host: &str) -> Option<String> {
 
 
 pub fn check_url(link: &str, allowed_base_domain: &str) -> Result<i32, Box<dyn std::error::Error>> {
-    let re_file = Regex::new(r"(?i)\.(pdf|pptx?|docx?|txt|csv|zip)(?:$|\?)")?;
+    let re_file = Regex::new(r"(?i)\.(pdf|pptx?|docx?|txt|csv|zip|exe|msi|7z|rar)(?:$|\?)")?;
 
     let u = Url::parse(link)?;
     let path_lc = u.path().to_ascii_lowercase();
@@ -57,3 +65,60 @@ pub fn check_url(link: &str, allowed_base_domain: &str) -> Result<i32, Box<dyn s
     }
     Ok(0)
 }
+
+/*
+
+Da sistemare output aggiungedo i path contrllati ad un Vec
+
+*/
+
+pub async fn check_path_status_url(link: String) {
+    let parti: Vec<&str> = link.split('/').collect();
+    for (i,_) in parti.iter().enumerate().take(parti.len() - 2){
+       let parts = parti[..parti.len()-i].join("/");
+       println!("{:?}",parts );
+       let status = check_status_url(parts).await;
+       println!("{:?}", status);
+    }
+}
+
+/*
+
+
+    Tuple
+    (1, "") => 200 o 300/301/302
+    (1, string) => 300 + header location
+    (2, "") => 404,403,500,timeout, dns problem
+
+*/
+
+async fn check_status_url(url: String) -> (i32, String) {
+    let client = Client::new();
+
+    match client.get(url).send().await {
+        Ok(resp) => {
+            let status = resp.status();
+
+            if status.is_redirection() {
+                match resp.headers().get(header::LOCATION).and_then(|v| v.to_str().ok()) {
+                    Some(loc) => return (1,loc.to_string()),
+                    None => return (1, "".to_string()),
+                }
+            } else if status.is_success() {
+                return (1, "".to_string())
+            } else {
+                return (2, "".to_string())
+            }
+        }
+        Err(e) => {
+            if e.is_connect() {
+                return (2, "".to_string())
+            } else if e.is_timeout() {
+                return (2, "".to_string())
+            } else {
+                return (2, "".to_string())
+            }
+        }
+    }
+}
+

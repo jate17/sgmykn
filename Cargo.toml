@@ -9,8 +9,10 @@ scraper = "0.24.0"
 url = "2.5.7"
 
 # Tokio: abilita le macro e il runtime multithread
-tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.47.1", features = ["full"] }
+
 
 # Reqwest: usa rustls (evita problemi OpenSSL) e abilita compressioni comuni
 reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls", "gzip", "brotli", "deflate"] }
 publicsuffix = "2.3.0"
+futures = "0.3.31"
