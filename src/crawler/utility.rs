@@ -3,7 +3,7 @@ use url::Url;
 use std::collections::HashMap;
 use std::str;
 use reqwest::{self, Client, header};
-
+use std::error::Error;
 
 pub fn append_to_crawl(link: String, typez: i32, wheres: &mut HashMap<i32, Vec<String>>){
     wheres.entry(typez).or_insert(Vec::new()).push(link.to_string())
@@ -72,14 +72,25 @@ Da sistemare output aggiungedo i path contrllati ad un Vec
 
 */
 
-pub async fn check_path_status_url(link: String) {
+
+pub async fn check_path_status_url(link: String, dct: &mut Vec<String>) ->  Result<(), Box<dyn Error>>  {
+    let re_file = Regex::new(r"(?i)\.(pdf|pptx?|docx?|txt|csv|zip|exe|msi|7z|rar)(?:$|\?)")?;
     let parti: Vec<&str> = link.split('/').collect();
     for (i,_) in parti.iter().enumerate().take(parti.len() - 2){
        let parts = parti[..parti.len()-i].join("/");
-       println!("{:?}",parts );
-       let status = check_status_url(parts).await;
-       println!("{:?}", status);
+       if !re_file.is_match(&parts.as_str()){
+            if !dct.contains(&parts){
+                let status = check_status_url(&parts).await;
+                if status.0 == 1 {
+                    if status.1 != "" {
+                                dct.push(status.1);
+                    }
+                    dct.push(parts);
+                }
+            }
+        }
     }
+    Ok(())
 }
 
 /*
@@ -92,7 +103,7 @@ pub async fn check_path_status_url(link: String) {
 
 */
 
-async fn check_status_url(url: String) -> (i32, String) {
+async fn check_status_url(url: &String) -> (i32, String) {
     let client = Client::new();
 
     match client.get(url).send().await {
