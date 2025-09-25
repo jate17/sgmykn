@@ -2,8 +2,18 @@ use reqwest;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
 use crate::crawler::utility;
+use crate::db::db;
 
-pub async fn crawl_page(url_c: &str, wheres: &mut HashMap<i32, Vec<String>>) -> Result<(), Box<dyn std::error::Error>> { // <-- nome giusto + parametro
+
+
+/*
+Modificare output in un hashmap 
+
+HashMap<String>
+
+*/
+
+pub async fn crawl_page(url_c: &str, wheres: &mut Vec<String>) -> Result<(), Box<dyn std::error::Error>> { // <-- nome giusto + parametro
     let resp = reqwest::get(url_c).await?;
     let base_url = resp.url().clone();
     let body = resp.text().await?;

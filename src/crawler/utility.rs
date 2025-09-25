@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use std::str;
 use reqwest::{self, Client, header};
 use std::error::Error;
+use crate::db::db::{connet, read, add, get, search};
 
-pub fn append_to_crawl(link: String, typez: i32, wheres: &mut HashMap<i32, Vec<String>>){
-    wheres.entry(typez).or_insert(Vec::new()).push(link.to_string())
+pub fn append_to_crawl(link: String, typez: i32, wheres: &mut Vec<String>){
+    wheres.push(link.to_string())
 }
 
 pub fn extract_host(url: &str) -> Option<String> {
@@ -73,22 +74,40 @@ Da sistemare output aggiungedo i path contrllati ad un Vec
 */
 
 
-pub async fn check_path_status_url(link: String, dct: &mut Vec<String>) ->  Result<(), Box<dyn Error>>  {
-    let re_file = Regex::new(r"(?i)\.(pdf|pptx?|docx?|txt|csv|zip|exe|msi|7z|rar)(?:$|\?)")?;
-    let parti: Vec<&str> = link.split('/').collect();
-    for (i,_) in parti.iter().enumerate().take(parti.len() - 2){
-       let parts = parti[..parti.len()-i].join("/");
-       if !re_file.is_match(&parts.as_str()){
-            if !dct.contains(&parts){
-                let status = check_status_url(&parts).await;
-                if status.0 == 1 {
-                    if status.1 != "" {
-                                dct.push(status.1);
-                    }
-                    dct.push(parts);
+pub async fn analyze_link(target: String, con: &mut redis::Connection)->  Result<(), Box<dyn Error>> {
+
+
+    /*Ricerca iniziale*/
+    
+    let val = search(con, target.to_string(), 1)?;
+    println!("{:} - {:}", val, target);
+    if !val{
+
+        /*Capisce se è un file o no*/
+        let re_file = Regex::new(r"\.[a-z]{2,4}(?:\?.*)?$")?;
+        if re_file.is_match(&target){
+            add(con, 1, target.to_string())?;
+        }
+        
+         /*Divisioe dei vari path*/
+        let parti: Vec<&str> = target.split('/').collect();
+
+        for (i,_) in parti.iter().enumerate().take(parti.len() - 3){
+            let parts = parti[..parti.len()-i].join("/");
+            /*Ricerca le path se è presente*/
+            let val = search(con, parts.to_string(), 1)?;
+            if !val {
+                /*Controlla se è attivo*/
+               let status = check_status_url(&parts.to_string()).await;
+                if status.0 == 1 && status.1 == "" {
+                    add(con, 2, parts.to_string())?; 
+                }else if status.0 == 1 && status.1 != "" {
+                    add(con, 2, status.1.to_string())?;
                 }
             }
         }
+
+       
     }
     Ok(())
 }
